@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output and TypeScript caches
+dist/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Generated files
+coverage/
+.vitest/
+apps/server/generated/
+**/.prisma/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Temporary uploads and working files
+uploads/
+tmp/
+temp/
+*.tmp
+
+# Editor and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

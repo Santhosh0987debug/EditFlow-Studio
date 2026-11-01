@@ -1,0 +1,30 @@
+{
+  "name": "editflow-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A prompt-first media editing workspace for text, image, audio, and video.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "postinstall": "npm run build -w packages/shared",
+    "dev": "concurrently --kill-others-on-fail --names web,server --prefix-colors cyan,magenta \"npm run dev -w apps/web\" \"npm run dev -w apps/server\"",
+    "build": "npm run build -w packages/shared && npm run build -w apps/server && npm run build -w apps/web",
+    "test": "npm run test -w apps/server && npm run test -w apps/web",
+    "typecheck": "npm run build -w packages/shared && npm run typecheck -w apps/server && npm run typecheck -w apps/web",
+    "db:validate": "prisma validate --schema apps/server/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema apps/server/prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "prisma": "6.19.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2"
+  }
+}
