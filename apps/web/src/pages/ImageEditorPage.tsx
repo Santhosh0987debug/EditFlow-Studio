@@ -842,7 +842,7 @@ export function ImageEditorPage() {
 
       <footer className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>Text and image editing available · Audio and video later.</p>
+          <p>Text, image, and audio editing available · Video later.</p>
           <p>Originals are kept in version history.</p>
         </div>
       </footer>

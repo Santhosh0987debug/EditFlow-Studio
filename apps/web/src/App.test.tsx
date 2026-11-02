@@ -1,4 +1,7 @@
 import type {
+  AudioAssetDto,
+  AudioAssetSummaryDto,
+  AudioVersionDto,
   ImageAssetDto,
   ImageAssetSummaryDto,
   ImageVersionDto,
@@ -38,6 +41,12 @@ const apiMocks = vi.hoisted(() => ({
   previewImage: vi.fn(),
   saveImageVersion: vi.fn(),
   exportImage: vi.fn(),
+  listAudio: vi.fn(),
+  uploadAudio: vi.fn(),
+  getAudio: vi.fn(),
+  previewAudio: vi.fn(),
+  saveAudioVersion: vi.fn(),
+  exportAudio: vi.fn(),
 }));
 
 vi.mock("./api/client", () => {
@@ -96,6 +105,25 @@ vi.mock("./api/client", () => {
         download = false,
       ) =>
         `/api/projects/${projectId}/images/${imageId}/versions/${versionId}/file${
+          download ? "?download=1" : ""
+        }`,
+    },
+    audioApi: {
+      list: apiMocks.listAudio,
+      upload: apiMocks.uploadAudio,
+      get: apiMocks.getAudio,
+      preview: apiMocks.previewAudio,
+      saveVersion: apiMocks.saveAudioVersion,
+      exportAudio: apiMocks.exportAudio,
+      originalFileUrl: (projectId: string, audioId: string) =>
+        `/api/projects/${projectId}/audio/${audioId}/file`,
+      versionFileUrl: (
+        projectId: string,
+        audioId: string,
+        versionId: string,
+        download = false,
+      ) =>
+        `/api/projects/${projectId}/audio/${audioId}/versions/${versionId}/file${
           download ? "?download=1" : ""
         }`,
     },
@@ -236,6 +264,74 @@ const testImage: ImageAssetDto = {
   versions: [originalImageVersion],
 };
 
+const originalAudioVersion: AudioVersionDto = {
+  id: "audio_version_1",
+  version: 1,
+  source: "original",
+  mimeType: "audio/mpeg",
+  durationMs: 12_000,
+  sampleRate: 44_100,
+  channels: 2,
+  byteSize: 180_000,
+  operations: null,
+  createdAt: "2026-01-01T09:00:00.000Z",
+};
+
+const editedAudioVersion: AudioVersionDto = {
+  id: "audio_version_2",
+  version: 2,
+  source: "edited",
+  mimeType: "audio/mpeg",
+  durationMs: 7_600,
+  sampleRate: 44_100,
+  channels: 2,
+  byteSize: 121_000,
+  operations: {
+    trim: { startMs: 500, endMs: 10_000 },
+    speed: 1.25,
+    mergeAssetIds: [],
+  },
+  createdAt: "2026-01-01T10:00:00.000Z",
+};
+
+const testAudioSummary: AudioAssetSummaryDto = {
+  id: "audio_123",
+  projectId: testProject.id,
+  name: "Launch audio",
+  originalFilename: "launch-audio.mp3",
+  mimeType: "audio/mpeg",
+  durationMs: 12_000,
+  sampleRate: 44_100,
+  channels: 2,
+  byteSize: 180_000,
+  createdAt: "2026-01-01T09:00:00.000Z",
+  updatedAt: "2026-01-01T09:00:00.000Z",
+  versionCount: 1,
+  latestVersion: originalAudioVersion,
+};
+
+const testAudio: AudioAssetDto = {
+  ...testAudioSummary,
+  originalVersion: originalAudioVersion,
+  versions: [originalAudioVersion],
+};
+
+const secondAudioSummary: AudioAssetSummaryDto = {
+  ...testAudioSummary,
+  id: "audio_456",
+  name: "Second clip",
+  originalFilename: "second-clip.mp3",
+  durationMs: 8_000,
+};
+
+const thirdAudioSummary: AudioAssetSummaryDto = {
+  ...testAudioSummary,
+  id: "audio_789",
+  name: "Third clip",
+  originalFilename: "third-clip.mp3",
+  durationMs: 4_000,
+};
+
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -271,6 +367,18 @@ beforeEach(() => {
   });
   apiMocks.exportImage.mockResolvedValue(
     new Blob(["export"], { type: "image/png" }),
+  );
+  apiMocks.listAudio.mockResolvedValue({ audio: [] });
+  apiMocks.getAudio.mockResolvedValue({ audio: testAudio });
+  apiMocks.previewAudio.mockResolvedValue(
+    new Blob(["preview"], { type: "audio/mpeg" }),
+  );
+  apiMocks.uploadAudio.mockResolvedValue({ audio: testAudio });
+  apiMocks.saveAudioVersion.mockResolvedValue({
+    version: editedAudioVersion,
+  });
+  apiMocks.exportAudio.mockResolvedValue(
+    new Blob(["export"], { type: "audio/mpeg" }),
   );
   signedOut();
 });
@@ -471,7 +579,7 @@ describe("dashboard projects", () => {
     expect(apiMocks.deleteProject).not.toHaveBeenCalled();
   });
 
-  it("links each project to the text and image editors", async () => {
+  it("links each project to the text, image, and audio editors", async () => {
     signedIn();
     apiMocks.listProjects.mockResolvedValueOnce({ projects: [testProject] });
 
@@ -483,6 +591,9 @@ describe("dashboard projects", () => {
     const imageLink = screen.getByRole("link", {
       name: /open image editor for launch teaser/i,
     });
+    const audioLink = screen.getByRole("link", {
+      name: /open audio editor for launch teaser/i,
+    });
 
     expect(textLink).toHaveAttribute(
       "href",
@@ -491,6 +602,10 @@ describe("dashboard projects", () => {
     expect(imageLink).toHaveAttribute(
       "href",
       `/image-editor?project=${testProject.id}`,
+    );
+    expect(audioLink).toHaveAttribute(
+      "href",
+      `/audio-editor?project=${testProject.id}`,
     );
   });
 });
@@ -818,6 +933,317 @@ describe("text editor", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /try again/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("audio editor", () => {
+  function renderAudioEditor(
+    clipList: AudioAssetSummaryDto[] = [testAudioSummary],
+  ) {
+    signedIn();
+    apiMocks.listProjects.mockResolvedValue({ projects: [testProject] });
+    apiMocks.listAudio.mockResolvedValue({ audio: clipList });
+    return renderAt(`/audio-editor?project=${testProject.id}`);
+  }
+
+  it("loads the audio clip, original, edited preview, and version history", async () => {
+    renderAudioEditor();
+
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: /cut, speed up, and layer sound/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", {
+        name: /original versus edited audio comparison/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/launch audio original audio/i),
+    ).toHaveAttribute(
+      "src",
+      `/api/projects/${testProject.id}/audio/${testAudio.id}/file`,
+    );
+    await waitFor(() => {
+      expect(
+        screen
+          .getByLabelText(/launch audio edited audio preview/i)
+          .getAttribute("src"),
+      ).toMatch(/^blob:/);
+    });
+    expect(screen.getByText(/v1 .* Original/)).toBeInTheDocument();
+    expect(screen.getByText(/all edits saved/i)).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Version 1 audio"),
+    ).toHaveAttribute(
+      "src",
+      `/api/projects/${testProject.id}/audio/${testAudio.id}/versions/audio_version_1/file`,
+    );
+    expect(apiMocks.previewAudio).toHaveBeenCalledWith(
+      testProject.id,
+      testAudio.id,
+      expect.objectContaining({
+        trim: { startMs: 0, endMs: null },
+        speed: 1,
+        mergeAssetIds: [],
+      }),
+    );
+  });
+
+  it("auto-selects the first project when the URL has none", async () => {
+    signedIn();
+    apiMocks.listProjects.mockResolvedValue({ projects: [testProject] });
+    apiMocks.listAudio.mockResolvedValue({ audio: [testAudioSummary] });
+
+    renderAt("/audio-editor");
+
+    await waitFor(() => {
+      expect(apiMocks.getAudio).toHaveBeenCalledWith(
+        testProject.id,
+        testAudio.id,
+      );
+    });
+    expect(await screen.findByLabelText("Project")).toHaveValue(
+      testProject.id,
+    );
+  });
+
+  it("shows the empty state and uploads the first audio clip", async () => {
+    signedIn();
+    apiMocks.listProjects.mockResolvedValue({ projects: [testProject] });
+    apiMocks.listAudio.mockResolvedValue({ audio: [] });
+
+    renderAt(`/audio-editor?project=${testProject.id}`);
+
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: /add the first audio clip/i,
+      }),
+    ).toBeInTheDocument();
+
+    const file = new File(["mp3"], "launch-audio.mp3", {
+      type: "audio/mpeg",
+    });
+    fireEvent.change(
+      screen.getByLabelText("Upload audio", { selector: "input" }),
+      {
+      target: { files: [file] },
+    });
+
+    await waitFor(() => {
+      expect(apiMocks.uploadAudio).toHaveBeenCalledWith(testProject.id, file);
+    });
+    expect(await screen.findByText(/audio uploaded/i)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", {
+        name: /open audio launch audio/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("validates file type before uploading", async () => {
+    signedIn();
+    apiMocks.listProjects.mockResolvedValue({ projects: [testProject] });
+    apiMocks.listAudio.mockResolvedValue({ audio: [] });
+
+    renderAt(`/audio-editor?project=${testProject.id}`);
+
+    await screen.findByRole("heading", {
+      level: 2,
+      name: /add the first audio clip/i,
+    });
+    const file = new File(["text"], "notes.txt", { type: "text/plain" });
+    fireEvent.change(
+      screen.getByLabelText("Upload audio", { selector: "input" }),
+      {
+      target: { files: [file] },
+    });
+
+    expect(
+      await screen.findByText(/Choose an MP3, WAV, OGG, or M4A/i),
+    ).toBeInTheDocument();
+    expect(apiMocks.uploadAudio).not.toHaveBeenCalled();
+  });
+
+  it("previews trim timestamps, speed changes, and reset", async () => {
+    renderAudioEditor();
+
+    const start = await screen.findByLabelText("Start timestamp");
+    fireEvent.change(start, { target: { value: "1.5" } });
+    fireEvent.blur(start);
+
+    const end = screen.getByLabelText("End timestamp");
+    fireEvent.change(end, { target: { value: "5" } });
+    fireEvent.blur(end);
+
+    fireEvent.change(screen.getByLabelText("Playback speed"), {
+      target: { value: "1.5" },
+    });
+
+    await waitFor(() => {
+      expect(apiMocks.previewAudio).toHaveBeenLastCalledWith(
+        testProject.id,
+        testAudio.id,
+        {
+          trim: { startMs: 1500, endMs: 5000 },
+          speed: 1.5,
+          mergeAssetIds: [],
+        },
+      );
+    });
+    expect(screen.getByText(/unsaved edits/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^reset$/i }));
+    expect(screen.getByLabelText("Start timestamp")).toHaveValue("0:00.000");
+    expect(screen.getByLabelText("Playback speed")).toHaveValue("1");
+    expect(screen.getByText(/all edits saved/i)).toBeInTheDocument();
+  });
+
+  it("merges clips in the chosen order", async () => {
+    renderAudioEditor([
+      testAudioSummary,
+      secondAudioSummary,
+      thirdAudioSummary,
+    ]);
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /add second clip to merge/i,
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /add third clip to merge/i,
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /move third clip earlier/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(apiMocks.previewAudio).toHaveBeenLastCalledWith(
+        testProject.id,
+        testAudio.id,
+        expect.objectContaining({
+          mergeAssetIds: ["audio_789", "audio_456"],
+        }),
+      );
+    });
+    expect(screen.getAllByText(/3 clips/i).length).toBeGreaterThan(0);
+  });
+
+  it("saves the current edit as a new version", async () => {
+    renderAudioEditor();
+
+    fireEvent.change(await screen.findByLabelText("Playback speed"), {
+      target: { value: "1.5" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: /save edited version/i }),
+    );
+
+    await waitFor(() => {
+      expect(apiMocks.saveAudioVersion).toHaveBeenCalledWith(
+        testProject.id,
+        testAudio.id,
+        {
+          operations: expect.objectContaining({
+            speed: 1.5,
+            trim: { startMs: 0, endMs: null },
+          }),
+        },
+      );
+    });
+    expect(await screen.findByText(/version 2 saved/i)).toBeInTheDocument();
+    expect(screen.getByText(/v2 .* Edited/)).toBeInTheDocument();
+    expect(screen.getByText(/all edits saved/i)).toBeInTheDocument();
+  });
+
+  it("exports the edited audio with the current settings", async () => {
+    renderAudioEditor();
+    await screen.findByLabelText("Playback speed");
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /export edited audio/i }),
+    );
+
+    await waitFor(() => {
+      expect(apiMocks.exportAudio).toHaveBeenCalledWith(
+        testProject.id,
+        testAudio.id,
+        expect.objectContaining({
+          speed: 1,
+          trim: { startMs: 0, endMs: null },
+        }),
+      );
+    });
+    expect(
+      await screen.findByText(/exported as an mp3/i),
+    ).toBeInTheDocument();
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it("restores settings from a saved audio version", async () => {
+    apiMocks.getAudio.mockResolvedValue({
+      audio: {
+        ...testAudio,
+        versionCount: 2,
+        latestVersion: editedAudioVersion,
+        versions: [editedAudioVersion, originalAudioVersion],
+      },
+    });
+
+    renderAudioEditor();
+
+    expect(await screen.findByText(/v2 .* Edited/)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Playback speed")).toHaveValue("1.25");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /restore original settings/i }),
+    );
+    expect(screen.getByLabelText("Playback speed")).toHaveValue("1");
+    expect(
+      screen.getByText(/original settings restored in the editor/i),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /use settings from version 2/i }),
+    );
+    expect(screen.getByLabelText("Playback speed")).toHaveValue("1.25");
+  });
+
+  it("shows a retryable error when audio cannot be loaded", async () => {
+    signedIn();
+    apiMocks.listProjects.mockResolvedValue({ projects: [testProject] });
+    apiMocks.listAudio.mockRejectedValueOnce(
+      new ApiClientError(500, "Audio could not be loaded."),
+    );
+
+    renderAt(`/audio-editor?project=${testProject.id}`);
+
+    expect(
+      await screen.findByText("Audio could not be loaded."),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+
+    await waitFor(() => {
+      expect(apiMocks.listAudio).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: /add the first audio clip/i,
+      }),
     ).toBeInTheDocument();
   });
 });

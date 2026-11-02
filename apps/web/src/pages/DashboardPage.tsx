@@ -172,9 +172,9 @@ export function DashboardPage() {
               Your projects
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">
-              Welcome back, {firstName}. Open the text or image editor from any
-              project, or create a new workspace for what you want to work on
-              next.
+              Welcome back, {firstName}. Open the text, image, or audio editor
+              from any project, or create a new workspace for what you want to
+              work on next.
             </p>
           </div>
 
@@ -221,8 +221,8 @@ export function DashboardPage() {
               Create a project
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Give this workspace a clear name. Text documents and images are
-              saved as versions inside their project.
+              Give this workspace a clear name. Text documents, images, and
+              audio are saved as versions inside their project.
             </p>
 
             <form className="mt-5 space-y-4" onSubmit={handleCreate}>
@@ -436,6 +436,13 @@ export function DashboardPage() {
                           Image
                         </Link>
                         <Link
+                          to={`/audio-editor?project=${encodeURIComponent(project.id)}`}
+                          aria-label={`Open audio editor for ${project.name}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300/20 bg-amber-400/10 px-2.5 py-1.5 text-xs font-medium text-amber-100 transition hover:border-amber-300/40 hover:bg-amber-400/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                        >
+                          Audio
+                        </Link>
+                        <Link
                           to={`/editor?project=${encodeURIComponent(project.id)}`}
                           aria-label={`Open editor for ${project.name}`}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:border-cyan-300/40 hover:bg-cyan-400/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
@@ -480,7 +487,7 @@ export function DashboardPage() {
 
       <footer className="border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>Text and image editing available · Audio and video later.</p>
+          <p>Text, image, and audio editing available · Video later.</p>
           <p>EditFlow Studio</p>
         </div>
       </footer>

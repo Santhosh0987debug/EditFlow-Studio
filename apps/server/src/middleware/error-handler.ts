@@ -38,14 +38,19 @@ export const errorHandler: ErrorRequestHandler = (
   }
 
   if (error instanceof multer.MulterError) {
+    const isAudio = error.field === "audio";
     const message =
       error.code === "LIMIT_FILE_SIZE"
-        ? "The image must be 10 MB or smaller."
-        : "The image upload could not be processed.";
+        ? isAudio
+          ? "The audio file must be 25 MB or smaller."
+          : "The image must be 10 MB or smaller."
+        : isAudio
+          ? "The audio upload could not be processed."
+          : "The image upload could not be processed.";
 
     response.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({
       error: message,
-      fields: { image: message },
+      fields: { [isAudio ? "audio" : "image"]: message },
     });
     return;
   }

@@ -27,6 +27,7 @@ model Project {
   owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   textDocument TextDocument?
   images       ImageAsset[]
+  audio        AudioAsset[]
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
@@ -107,4 +108,48 @@ model ImageVersion {
   @@unique([assetId, version])
   @@index([assetId, createdAt])
   @@map("image_versions")
+}
+
+model AudioAsset {
+  id               String         @id @default(cuid())
+  projectId        String         @map("project_id")
+  project          Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name             String
+  originalFilename String         @map("original_filename")
+  mimeType         String         @map("mime_type")
+  durationMs       Int            @map("duration_ms")
+  sampleRate       Int            @map("sample_rate")
+  channels         Int
+  byteSize         Int            @map("byte_size")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+  versions         AudioVersion[]
+
+  @@index([projectId, updatedAt])
+  @@map("audio_assets")
+}
+
+enum AudioVersionSource {
+  original
+  edited
+}
+
+model AudioVersion {
+  id         String             @id @default(cuid())
+  assetId    String             @map("asset_id")
+  asset      AudioAsset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  version    Int
+  source     AudioVersionSource @default(edited)
+  storageKey String             @map("storage_key")
+  mimeType   String             @map("mime_type")
+  durationMs Int                @map("duration_ms")
+  sampleRate Int                @map("sample_rate")
+  channels   Int
+  byteSize   Int                @map("byte_size")
+  operations Json?
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  @@unique([assetId, version])
+  @@index([assetId, createdAt])
+  @@map("audio_versions")
 }

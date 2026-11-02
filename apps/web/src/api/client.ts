@@ -3,6 +3,9 @@ import type {
   AiTextRequest,
   AiTextResponse,
   ApiErrorResponse,
+  AudioAssetListResponse,
+  AudioAssetResponse,
+  AudioOperations,
   AuthResponse,
   CreateProjectRequest,
   ImageAssetListResponse,
@@ -12,6 +15,8 @@ import type {
   ProjectListResponse,
   ProjectResponse,
   RegisterRequest,
+  SaveAudioVersionRequest,
+  SaveAudioVersionResponse,
   SaveImageVersionRequest,
   SaveImageVersionResponse,
   SaveTextVersionRequest,
@@ -97,7 +102,7 @@ async function requestBlob(
     method: options.method ?? "GET",
     credentials: "include",
     headers: {
-      Accept: "image/*",
+      Accept: "*/*",
       ...(options.body === undefined
         ? {}
         : { "Content-Type": "application/json" }),
@@ -112,9 +117,13 @@ async function requestBlob(
   return response.blob();
 }
 
-async function requestUpload<T>(path: string, file: File): Promise<T> {
+async function requestUpload<T>(
+  path: string,
+  file: File,
+  field: "image" | "audio" = "image",
+): Promise<T> {
   const formData = new FormData();
-  formData.append("image", file);
+  formData.append(field, file);
 
   const response = await fetch(path, {
     method: "POST",
@@ -189,7 +198,7 @@ export const imageApi = {
   list: (projectId: string) =>
     request<ImageAssetListResponse>(imagesBasePath(projectId)),
   upload: (projectId: string, file: File) =>
-    requestUpload<ImageAssetResponse>(imagesBasePath(projectId), file),
+    requestUpload<ImageAssetResponse>(imagesBasePath(projectId), file, "image"),
   get: (projectId: string, imageId: string) =>
     request<ImageAssetResponse>(
       `${imagesBasePath(projectId)}/${encodeURIComponent(imageId)}`,
@@ -239,6 +248,68 @@ export const imageApi = {
     download = false,
   ) =>
     `${imagesBasePath(projectId)}/${encodeURIComponent(imageId)}/versions/${encodeURIComponent(versionId)}/file${
+      download ? "?download=1" : ""
+    }`,
+};
+
+function audioBasePath(projectId: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/audio`;
+}
+
+export const audioApi = {
+  list: (projectId: string) =>
+    request<AudioAssetListResponse>(audioBasePath(projectId)),
+  upload: (projectId: string, file: File) =>
+    requestUpload<AudioAssetResponse>(audioBasePath(projectId), file, "audio"),
+  get: (projectId: string, audioId: string) =>
+    request<AudioAssetResponse>(
+      `${audioBasePath(projectId)}/${encodeURIComponent(audioId)}`,
+    ),
+  preview: (
+    projectId: string,
+    audioId: string,
+    operations: AudioOperations,
+  ) =>
+    requestBlob(
+      `${audioBasePath(projectId)}/${encodeURIComponent(audioId)}/preview`,
+      {
+        method: "POST",
+        body: { operations },
+      },
+    ),
+  saveVersion: (
+    projectId: string,
+    audioId: string,
+    input: SaveAudioVersionRequest,
+  ) =>
+    request<SaveAudioVersionResponse>(
+      `${audioBasePath(projectId)}/${encodeURIComponent(audioId)}/versions`,
+      {
+        method: "POST",
+        body: input,
+      },
+    ),
+  exportAudio: (
+    projectId: string,
+    audioId: string,
+    operations: AudioOperations,
+  ) =>
+    requestBlob(
+      `${audioBasePath(projectId)}/${encodeURIComponent(audioId)}/export`,
+      {
+        method: "POST",
+        body: { operations },
+      },
+    ),
+  originalFileUrl: (projectId: string, audioId: string) =>
+    `${audioBasePath(projectId)}/${encodeURIComponent(audioId)}/file`,
+  versionFileUrl: (
+    projectId: string,
+    audioId: string,
+    versionId: string,
+    download = false,
+  ) =>
+    `${audioBasePath(projectId)}/${encodeURIComponent(audioId)}/versions/${encodeURIComponent(versionId)}/file${
       download ? "?download=1" : ""
     }`,
 };

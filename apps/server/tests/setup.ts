@@ -14,8 +14,14 @@ const imageStorageDir = mkdtempSync(
 );
 process.env.IMAGE_STORAGE_DIR = imageStorageDir;
 
+const audioStorageDir = mkdtempSync(
+  path.join(os.tmpdir(), "editflow-studio-audio-"),
+);
+process.env.AUDIO_STORAGE_DIR = audioStorageDir;
+
 afterAll(() => {
   rmSync(imageStorageDir, { recursive: true, force: true });
+  rmSync(audioStorageDir, { recursive: true, force: true });
 });
 
 // Keep AI tests deterministic even when the developer's .env configures a

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute, PublicOnlyRoute } from "./auth/route-guards";
+import { AudioEditorPage } from "./pages/AudioEditorPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EditorPage } from "./pages/EditorPage";
 import { ImageEditorPage } from "./pages/ImageEditorPage";
@@ -21,6 +22,7 @@ function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/editor" element={<EditorPage />} />
         <Route path="/image-editor" element={<ImageEditorPage />} />
+        <Route path="/audio-editor" element={<AudioEditorPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

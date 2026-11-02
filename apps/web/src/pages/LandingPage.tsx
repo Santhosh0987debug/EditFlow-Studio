@@ -31,7 +31,7 @@ const mediaPreviews: MediaPreview[] = [
     kind: "audio",
     title: "Audio",
     description:
-      "Map out trims, levels, and cleanup with a reviewable editing plan.",
+      "Trim with timestamps, change speed, and merge clips in a chosen order.",
     glyph: "≋",
     accent: "bg-amber-400/10 text-amber-300 ring-amber-400/20",
   },
@@ -119,9 +119,9 @@ export function LandingPage() {
                   className="h-1.5 w-1.5 rounded-full bg-emerald-400"
                   aria-hidden="true"
                 />
-                Text and image editors enabled
+                Text, image, and audio editors enabled
               </span>
-              <span className="text-slate-500">Phase 4</span>
+              <span className="text-slate-500">Phase 5</span>
             </p>
             <h1
               id="hero-heading"
@@ -137,8 +137,9 @@ export function LandingPage() {
             </p>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-400">
               Describe the change you want in plain language. Edit text with AI
-              proposals, shape images with non-destructive controls, and save
-              only what you approve. Audio and video editing follow later.
+              proposals, shape images with non-destructive controls, and trim or
+              merge audio clips. Save only what you approve. Video editing
+              follows later.
             </p>
 
             <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -184,7 +185,7 @@ export function LandingPage() {
               </p>
             </div>
             <span className="text-xs font-medium tracking-[0.2em] text-slate-500 uppercase">
-              Text and image live · more planned
+              Text, image, and audio live · more planned
             </span>
           </div>
 
@@ -215,7 +216,7 @@ export function LandingPage() {
       <footer className="relative border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            Text and image editing with version history · Audio and video later.
+            Text, image, and audio editing with version history · Video later.
           </p>
           <p>React · Express · Prisma</p>
         </div>

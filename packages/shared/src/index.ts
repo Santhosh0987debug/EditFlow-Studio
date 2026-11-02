@@ -289,3 +289,113 @@ export interface SaveImageVersionResponse {
 export interface ImagePreviewRequest {
   operations: ImageOperations;
 }
+
+/**
+ * Audio containers that are safe and practical to decode with FFmpeg and play
+ * in modern browsers. The bytes are still inspected with ffprobe on upload.
+ */
+export const ALLOWED_AUDIO_MIME_TYPES = [
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/wave",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/x-m4a",
+] as const;
+
+export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+export const MIN_AUDIO_DURATION_MS = 500;
+export const MAX_AUDIO_DURATION_MS = 10 * 60 * 1000;
+export const MIN_AUDIO_SPEED = 0.5;
+export const MAX_AUDIO_SPEED = 2;
+export const MAX_AUDIO_MERGE_CLIPS = 8;
+export const AUDIO_PREVIEW_MIME_TYPE = "audio/mpeg";
+
+/**
+ * Trim boundaries in milliseconds, measured from the start of the source
+ * (including any merged clips). A null end keeps the rest of the audio.
+ */
+export interface AudioTrim {
+  startMs: number;
+  endMs: number | null;
+}
+
+/**
+ * The complete, repeatable description of an audio edit. `mergeAssetIds`
+ * contains additional project clips in playback order after the primary clip.
+ */
+export interface AudioOperations {
+  trim: AudioTrim;
+  speed: number;
+  mergeAssetIds: string[];
+}
+
+export function createDefaultAudioOperations(): AudioOperations {
+  return {
+    trim: { startMs: 0, endMs: null },
+    speed: 1,
+    mergeAssetIds: [],
+  };
+}
+
+export const DEFAULT_AUDIO_OPERATIONS: AudioOperations =
+  createDefaultAudioOperations();
+
+export type AudioVersionSource = "original" | "edited";
+
+export interface AudioVersionDto {
+  id: string;
+  version: number;
+  source: AudioVersionSource;
+  mimeType: string;
+  durationMs: number;
+  sampleRate: number;
+  channels: number;
+  byteSize: number;
+  operations: AudioOperations | null;
+  createdAt: string;
+}
+
+export interface AudioAssetSummaryDto {
+  id: string;
+  projectId: string;
+  name: string;
+  originalFilename: string;
+  mimeType: string;
+  durationMs: number;
+  sampleRate: number;
+  channels: number;
+  byteSize: number;
+  createdAt: string;
+  updatedAt: string;
+  versionCount: number;
+  latestVersion: AudioVersionDto | null;
+}
+
+export interface AudioAssetDto extends AudioAssetSummaryDto {
+  originalVersion: AudioVersionDto | null;
+  versions: AudioVersionDto[];
+}
+
+export interface AudioAssetListResponse {
+  audio: AudioAssetSummaryDto[];
+}
+
+export interface AudioAssetResponse {
+  audio: AudioAssetDto;
+}
+
+export interface SaveAudioVersionRequest {
+  operations: AudioOperations;
+}
+
+export interface SaveAudioVersionResponse {
+  version: AudioVersionDto;
+}
+
+export interface AudioPreviewRequest {
+  operations: AudioOperations;
+}

@@ -4,9 +4,9 @@ A prompt-first media editing workspace. Users will eventually describe changes
 to text, images, audio, and video in natural language, review a structured edit
 plan, approve it, and then process the media.
 
-> **Status: Phase 4.** Accounts, sessions, projects, versioned text editing, and
-> non-destructive image editing are working. AI text editing is available when a
-> provider is configured. Audio and video editing are intentionally not
+> **Status: Phase 5.** Accounts, sessions, projects, versioned text editing,
+> non-destructive image editing, and audio editing are working. AI text editing
+> is available when a provider is configured. Video editing is intentionally not
 > implemented yet.
 
 ## Features
@@ -14,8 +14,8 @@ plan, approve it, and then process the media.
 - Email/password registration and login
 - Password hashing with bcrypt (cost factor 12)
 - Seven-day JWT session stored in an HttpOnly, SameSite=Lax cookie
-- Protected `/dashboard`, `/editor`, and `/image-editor` routes with session
-  bootstrap via `/api/auth/me`
+- Protected `/dashboard`, `/editor`, `/image-editor`, and `/audio-editor` routes
+  with session bootstrap via `/api/auth/me`
 - Project creation, listing, and deletion, scoped to the signed-in owner
 - Responsive text editor with a title, plain text/Markdown editing, a formatting
   toolbar, and a safe rendered preview
@@ -30,8 +30,18 @@ plan, approve it, and then process the media.
   resize, and basic filters (grayscale, sepia, blur, sharpen)
 - Side-by-side before/after preview with reset and undo, plus separately saved
   image versions and edited-image export
-- Protected image delivery through the authenticated API rather than public
-  static files
+- Audio upload for MP3, WAV, OGG, and M4A with byte-level FFprobe validation,
+  duration, sample rate, channel, and size checks
+- Non-destructive audio controls for timestamp-based trimming, 0.5×–2×
+  pitch-preserving speed changes, and merging multiple clips in a chosen order
+- Real MP3 previews rendered with FFmpeg, with the preserved original and the
+  current edit side by side, plus reset and undo
+- Append-only audio versions linked to their project; earlier versions and the
+  preserved original remain playable and downloadable
+- Edited-audio export as a 44.1 kHz stereo MP3, with HTTP Range support for
+  seeking during playback
+- Protected image and audio delivery through the authenticated API rather than
+  public static files
 - Clear loading, empty, success, and error states, including an explicit
   configuration message when no AI provider is available
 - Server-side request validation with Zod and consistent JSON errors
@@ -42,6 +52,8 @@ plan, approve it, and then process the media.
 - **Web:** React, TypeScript, Vite, Tailwind CSS, React Router
 - **Server:** Node.js, Express, TypeScript, Zod
 - **Image processing:** sharp; Multer for multipart uploads
+- **Audio processing:** FFmpeg and FFprobe invoked through Node's `spawn`; Multer
+  for multipart uploads
 - **Database:** PostgreSQL with Prisma
 - **Auth:** bcryptjs, JSON Web Tokens, HttpOnly cookies
 - **Packages:** npm workspaces
@@ -51,6 +63,11 @@ plan, approve it, and then process the media.
 - Node.js 22.12 or newer
 - npm 10 or newer
 - A running PostgreSQL server (the project was verified with PostgreSQL 17)
+- FFmpeg and FFprobe installed and available on `PATH` (verified with FFmpeg
+  8.1.2). Install a build with MP3 support (`libmp3lame`), or set
+  `FFMPEG_PATH` and `FFPROBE_PATH` to their absolute paths. The API reports a
+  clear error if either binary is unavailable; text and image editing still
+  work.
 
 ## Getting started
 
@@ -98,6 +115,13 @@ VITE_API_PROXY_TARGET=http://localhost:3001
 
 # Optional image storage location. Defaults to uploads/images in the repo root.
 # IMAGE_STORAGE_DIR=uploads/images
+
+# Optional audio storage location. Defaults to uploads/audio in the repo root.
+# AUDIO_STORAGE_DIR=uploads/audio
+
+# Optional FFmpeg binaries. Both default to PATH lookup.
+# FFMPEG_PATH=/usr/local/bin/ffmpeg
+# FFPROBE_PATH=/usr/local/bin/ffprobe
 
 # Optional AI editing. Leave these unset to use the editor without AI.
 # AI_PROVIDER=openai-compatible
@@ -164,6 +188,7 @@ EditFlow-Studio/
 │   │   │   ├── components/       Shared UI primitives
 │   │   │   ├── editor/           Markdown editor, AI panel, comparison, history
 │   │   │   ├── images/           Image controls, preview, uploader, versions
+│   │   │   ├── audio/            Audio controls, preview, uploader, versions
 │   │   │   ├── pages/            Landing, auth, dashboard, and editor pages
 │   │   │   ├── projects/         Project loading/CRUD hook
 │   │   │   ├── test/             Test setup
@@ -180,6 +205,7 @@ EditFlow-Studio/
 │       │   ├── middleware/       Authentication and error handling
 │       │   ├── modules/
 │       │   │   ├── ai/           Provider interface and structured editing
+│       │   │   ├── audio/        FFmpeg processing, storage, and versions
 │       │   │   ├── auth/
 │       │   │   ├── images/       Upload, processing, storage, and versions
 │       │   │   ├── projects/
@@ -191,6 +217,7 @@ EditFlow-Studio/
 ├── packages/
 │   └── shared/                  Shared API types
 ├── uploads/images/              Local image storage (gitignored)
+├── uploads/audio/               Local audio storage (gitignored)
 ├── .env.example
 ├── package.json
 └── README.md
@@ -206,6 +233,9 @@ EditFlow-Studio/
 | `JWT_SECRET`            | HS256 signing secret. Must be at least 32 characters.      |
 | `VITE_API_PROXY_TARGET` | Vite dev/preview proxy target.                             |
 | `IMAGE_STORAGE_DIR`     | Optional image directory. Defaults to `uploads/images`.    |
+| `AUDIO_STORAGE_DIR`     | Optional audio directory. Defaults to `uploads/audio`.     |
+| `FFMPEG_PATH`           | Optional FFmpeg executable. Defaults to `ffmpeg` on PATH.  |
+| `FFPROBE_PATH`          | Optional FFprobe executable. Defaults to `ffprobe` on PATH.|
 | `AI_PROVIDER`           | Optional. Only `openai-compatible` is supported.           |
 | `AI_API_KEY`            | Optional provider key. Never commit a real value.          |
 | `AI_MODEL`              | Optional model identifier, for example `gpt-4o-mini`.      |
@@ -261,6 +291,14 @@ All error responses use the shared shape:
 | `POST`   | `/api/projects/:projectId/images/:id/versions`| Yes | Save a processed edited version.           |
 | `GET`    | `/api/projects/:projectId/images/:id/versions/:versionId/file` | Yes | Serve or download a saved version. |
 | `POST`   | `/api/projects/:projectId/images/:id/export`| Yes  | Download the current edit as an image.       |
+| `GET`    | `/api/projects/:projectId/audio`            | Yes  | List audio metadata and latest versions.     |
+| `POST`   | `/api/projects/:projectId/audio`            | Yes  | Upload an MP3, WAV, OGG, or M4A clip.        |
+| `GET`    | `/api/projects/:projectId/audio/:id`        | Yes  | Read audio metadata and versions.            |
+| `GET`    | `/api/projects/:projectId/audio/:id/file`   | Yes  | Stream the preserved original (Range aware). |
+| `POST`   | `/api/projects/:projectId/audio/:id/preview`| Yes  | Render a processed MP3 preview.              |
+| `POST`   | `/api/projects/:projectId/audio/:id/versions`| Yes | Save a processed edited version.             |
+| `GET`    | `/api/projects/:projectId/audio/:id/versions/:versionId/file` | Yes | Stream or download a saved version. |
+| `POST`   | `/api/projects/:projectId/audio/:id/export` | Yes  | Download the current edit as an MP3.         |
 | `GET`    | `/api/ai/status`                            | Yes  | Report provider configuration.               |
 | `POST`   | `/api/ai/generate`                          | Yes  | Generate a validated editing proposal.       |
 | `GET`    | `/api/health`                               | No   | Return API status.                           |
@@ -271,7 +309,14 @@ Saving a text version accepts `{ title, content, source? }`, where `source` is
 `manual`, `ai_accepted`, or `restored`. Image upload uses the multipart field
 `image` (JPEG, PNG, or WebP, up to 10 MB). Preview, save, and export accept
 `{ operations }`, where operations include `brightness`, `contrast`,
-`saturation`, `filter`, `crop`, and `resize`. AI generation accepts
+`saturation`, `filter`, `crop`, and `resize`. Audio upload uses the multipart
+field `audio` (MP3, WAV, OGG, or M4A, up to 25 MB and 10 minutes per upload).
+Audio preview, save, and export accept `{ operations }` with
+`trim: { startMs, endMs | null }`, `speed` (0.5–2), and `mergeAssetIds`. Trim
+timestamps refer to the merged timeline; speed is applied after merge and trim.
+The primary clip is followed by up to eight merged clips in the selected order.
+MP3 previews, saved versions, and exports are normalized to 44.1 kHz stereo at
+192 kb/s. AI generation accepts
 `{ action, content, instruction?, tone?, targetLanguage? }`; `tone` is required
 for the `tone` action and `targetLanguage` for `translate`. Passwords and
 provider credentials are never returned by the API.
@@ -288,10 +333,17 @@ provider credentials are never returned by the API.
 - Project queries always include the authenticated `ownerId`.
 - Uploaded images are validated by MIME type, decoded format, dimensions, and
   byte size. SVG and other executable/vector formats are rejected.
-- Image files are served only through authenticated, owner-scoped API routes;
-  the storage directory is not exposed as a static folder.
+- Uploaded audio is validated by extension/MIME type, network size limit, and
+  FFprobe inspection of the actual container, codec, duration, sample rate, and
+  channels. Renamed non-audio files are rejected.
+- FFmpeg and FFprobe run as argument arrays through `spawn`, never through a
+  shell, so filenames and operation values cannot inject commands.
+- Image and audio files are served only through authenticated, owner-scoped API
+  routes; the storage directories are not exposed as static folders.
 - Stored file paths come from server-generated keys and are resolved under the
   configured storage root to prevent path traversal.
+- Audio playback uses HTTP `Range` requests but still requires the session
+  cookie, so seeking does not bypass project ownership checks.
 - API responses set `Cache-Control: no-store`.
 
 This is an application foundation, not a complete production security program.
@@ -313,6 +365,13 @@ implemented yet.
   file, with a sequential version number, source (`original`, `edited`),
   dimensions, byte size, and the operations used to create it. Versions cascade
   when their asset or project is deleted.
+- **AudioAsset:** one uploaded clip per row, with display name, original
+  filename, detected MIME type, duration, sample rate, channels, byte size, and
+  timestamps.
+- **AudioVersion:** append-only pointer to the original or a rendered MP3, with a
+  sequential version number, source (`original`, `edited`), duration, sample
+  rate, channels, byte size, and the trim/speed/merge operations used. Versions
+  cascade when their asset or project is deleted.
 
 Migrations are applied with `npm run db:deploy`:
 
@@ -322,12 +381,15 @@ Migrations are applied with `npm run db:deploy`:
   text documents and versions.
 - `apps/server/prisma/migrations/20261102151520_image_editor/migration.sql` —
   image assets and versions.
+- `apps/server/prisma/migrations/20261102154416_audio_editor/migration.sql` —
+  audio assets and versions.
 
-Saving always inserts a new `TextVersion` or `ImageVersion`; earlier content and
-files are never updated or deleted. Reopening a text or image version only
-changes the browser draft. Accepting an AI proposal also changes only the draft,
-and saving records another version. Image processing always reads the preserved
-original and writes a new file for each saved edit.
+Saving always inserts a new `TextVersion`, `ImageVersion`, or `AudioVersion`;
+earlier content and files are never updated or deleted. Reopening a text or image
+version only changes the browser draft. Accepting an AI proposal also changes
+only the draft, and saving records another version. Image and audio processing
+always read the preserved original and write a new file for each saved edit or
+export.
 
 ## Text editor
 
@@ -378,6 +440,40 @@ serving. Each project/asset gets its own directory; filenames are generated
 server-side, so the original filename is metadata only. Override the root with
 `IMAGE_STORAGE_DIR` if needed. The storage directory is gitignored.
 
+## Audio editor
+
+Open the audio editor from any project card or visit:
+
+```text
+http://localhost:5173/audio-editor?project=<project-id>
+```
+
+Without a `project` query parameter the editor selects the first project. The
+audio editor supports:
+
+- Uploading MP3, WAV, OGG, or M4A files up to 25 MB and 10 minutes each. FFprobe
+  validates the actual container and codec, so a renamed non-audio file is
+  rejected.
+- Trimming with start and end timestamps, entered as seconds (`83.5`) or
+  `m:ss` (`1:23.5`), or adjusted with range sliders. Leave the end blank to keep
+  the rest of the clip.
+- Pitch-preserving playback speed from 0.5× to 2×, with preset buttons. Speed is
+  applied after merging and trimming, so it changes the final duration.
+- Merging the current clip with up to eight other clips in this project, with
+  controls to reorder or remove each additional clip. Trim timestamps refer to
+  the full merged timeline.
+- A real rendered MP3 preview beside the preserved original, plus undo, reset,
+  and an explicit unsaved-edits indicator.
+- Saving the current edit as a new `AudioVersion`, loading settings from an
+  earlier version, and downloading any version. The original is never changed.
+- Exporting the current edit as a 44.1 kHz stereo, 192 kb/s MP3 download.
+
+Uploaded files live under `uploads/audio` by default, outside public static
+serving. Each project/asset gets its own directory; filenames are generated
+server-side, so the original filename is metadata only. Override the root with
+`AUDIO_STORAGE_DIR`, and point at non-PATH binaries with `FFMPEG_PATH` and
+`FFPROBE_PATH`. Both storage directories are gitignored.
+
 ## Testing
 
 ```bash
@@ -390,15 +486,22 @@ npm test
   unconfigured-provider contract, prompt forwarding, strict proposal parsing,
   image upload validation, real sharp processing (crop, color, filter, resize),
   image ownership, append-only image versions, protected file delivery, and
-  export. Prisma is mocked so the test suite does not touch the development
-  database; generated image fixtures use a temporary storage directory.
+  export. Audio tests generate real MP3 fixtures with FFmpeg and cover upload
+  validation, duration/size limits, ownership, trim/speed previews, ordered
+  merging, parameter validation, append-only edited versions, Range-enabled
+  file delivery, and MP3 export. Prisma is mocked so the test suite does not
+  touch the development database; generated image and audio fixtures use
+  temporary storage directories. Audio tests require FFmpeg and FFprobe on
+  `PATH` (or configured through `FFMPEG_PATH`/`FFPROBE_PATH`).
 - **Frontend:** Vitest, jsdom, and Testing Library cover landing-page
   preservation, protected/public routing, login success and failure, session
   redirects, project create/delete flows, editor loading and project selection,
   saving, version reopening, saved-version comparison, AI configuration and
   proposal states, accept/reject, image loading and upload, before/after
   preview requests, control changes, reset/undo, image version saving and
-  loading, export, and retryable errors with mocked API responses.
+  loading, export, audio loading and upload, file-type validation, timestamp
+  trim and speed previews, ordered merge controls, audio version saving and
+  restoration, audio export, and retryable errors with mocked API responses.
 
 Type-check and build:
 
