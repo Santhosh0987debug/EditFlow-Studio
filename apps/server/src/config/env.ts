@@ -48,6 +48,22 @@ function readOptionalEnv(name: string): string | null {
   return value ? value : null;
 }
 
+const projectRoot = path.resolve(__dirname, "../../../..");
+
+// Uploaded originals and saved edits live outside the repository by default.
+// IMAGE_STORAGE_DIR may be absolute or relative to the repository root.
+function readImageStorageDir(): string {
+  const configured = readOptionalEnv("IMAGE_STORAGE_DIR");
+
+  if (!configured) {
+    return path.join(projectRoot, "uploads", "images");
+  }
+
+  return path.isAbsolute(configured)
+    ? configured
+    : path.resolve(projectRoot, configured);
+}
+
 export const env = {
   port: readPort(process.env.PORT),
   databaseUrl: requireEnv("DATABASE_URL"),
@@ -56,6 +72,7 @@ export const env = {
   isProduction: nodeEnv === "production",
   sessionCookieName: "editflow_session",
   sessionDurationMs,
+  imageStorageDir: readImageStorageDir(),
   aiProvider: readOptionalEnv("AI_PROVIDER"),
   aiApiKey: readOptionalEnv("AI_API_KEY"),
   aiModel: readOptionalEnv("AI_MODEL"),

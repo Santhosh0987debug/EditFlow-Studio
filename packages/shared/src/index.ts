@@ -164,3 +164,128 @@ export interface AiTextProposalDto {
 export interface AiTextResponse {
   proposal: AiTextProposalDto;
 }
+
+/**
+ * Image formats accepted by the editor. SVG is intentionally excluded because
+ * it can contain scripts and is not safely rasterized without extra validation.
+ */
+export const ALLOWED_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MIN_IMAGE_DIMENSION = 16;
+export const MAX_IMAGE_DIMENSION = 8192;
+
+/**
+ * Basic non-destructive filters. `none` leaves the image colors unchanged.
+ */
+export type ImageFilter =
+  | "none"
+  | "grayscale"
+  | "sepia"
+  | "blur"
+  | "sharpen";
+
+/**
+ * Crop rectangle expressed as percentages of the oriented source image.
+ * `left + width` and `top + height` may not exceed 100.
+ */
+export interface ImageCrop {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Resize target. Either side may be null to preserve the aspect ratio.
+ * Images are always fitted inside the target and are never enlarged.
+ */
+export interface ImageResize {
+  width: number | null;
+  height: number | null;
+}
+
+/**
+ * The full set of adjustments applied while producing an image preview,
+ * export, or saved version. Keeping this as data makes edits repeatable.
+ */
+export interface ImageOperations {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  filter: ImageFilter;
+  crop: ImageCrop | null;
+  resize: ImageResize;
+}
+
+export function createDefaultImageOperations(): ImageOperations {
+  return {
+    brightness: 0,
+    contrast: 0,
+    saturation: 0,
+    filter: "none",
+    crop: null,
+    resize: { width: null, height: null },
+  };
+}
+
+export const DEFAULT_IMAGE_OPERATIONS: ImageOperations =
+  createDefaultImageOperations();
+
+export type ImageVersionSource = "original" | "edited";
+
+export interface ImageVersionDto {
+  id: string;
+  version: number;
+  source: ImageVersionSource;
+  mimeType: string;
+  width: number;
+  height: number;
+  byteSize: number;
+  operations: ImageOperations | null;
+  createdAt: string;
+}
+
+export interface ImageAssetSummaryDto {
+  id: string;
+  projectId: string;
+  name: string;
+  originalFilename: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  byteSize: number;
+  createdAt: string;
+  updatedAt: string;
+  versionCount: number;
+  latestVersion: ImageVersionDto | null;
+}
+
+export interface ImageAssetDto extends ImageAssetSummaryDto {
+  originalVersion: ImageVersionDto | null;
+  versions: ImageVersionDto[];
+}
+
+export interface ImageAssetListResponse {
+  images: ImageAssetSummaryDto[];
+}
+
+export interface ImageAssetResponse {
+  image: ImageAssetDto;
+}
+
+export interface SaveImageVersionRequest {
+  operations: ImageOperations;
+}
+
+export interface SaveImageVersionResponse {
+  version: ImageVersionDto;
+}
+
+export interface ImagePreviewRequest {
+  operations: ImageOperations;
+}

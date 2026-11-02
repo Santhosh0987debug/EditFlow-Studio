@@ -5,10 +5,15 @@ import type {
   ApiErrorResponse,
   AuthResponse,
   CreateProjectRequest,
+  ImageAssetListResponse,
+  ImageAssetResponse,
+  ImageOperations,
   LoginRequest,
   ProjectListResponse,
   ProjectResponse,
   RegisterRequest,
+  SaveImageVersionRequest,
+  SaveImageVersionResponse,
   SaveTextVersionRequest,
   SaveTextVersionResponse,
   SessionResponse,
@@ -38,6 +43,25 @@ type RequestOptions = {
   body?: unknown;
 };
 
+async function throwResponseError(
+  response: Response,
+  path: string,
+): Promise<never> {
+  const body = (await response.json().catch(() => null)) as
+    | ApiErrorResponse
+    | null;
+
+  if (response.status === 401 && path !== "/api/auth/login") {
+    window.dispatchEvent(new Event("editflow:unauthorized"));
+  }
+
+  throw new ApiClientError(
+    response.status,
+    body?.error ?? "Something went wrong. Please try again.",
+    body?.fields,
+  );
+}
+
 async function request<T>(
   path: string,
   options: RequestOptions = {},
@@ -58,25 +82,52 @@ async function request<T>(
     return undefined as T;
   }
 
-  const body = (await response.json().catch(() => null)) as
-    | ApiErrorResponse
-    | T
-    | null;
-
   if (!response.ok) {
-    if (response.status === 401 && path !== "/api/auth/login") {
-      window.dispatchEvent(new Event("editflow:unauthorized"));
-    }
-
-    const errorBody = body as ApiErrorResponse | null;
-    throw new ApiClientError(
-      response.status,
-      errorBody?.error ?? "Something went wrong. Please try again.",
-      errorBody?.fields,
-    );
+    return throwResponseError(response, path);
   }
 
-  return body as T;
+  return (await response.json().catch(() => null)) as T;
+}
+
+async function requestBlob(
+  path: string,
+  options: RequestOptions = {},
+): Promise<Blob> {
+  const response = await fetch(path, {
+    method: options.method ?? "GET",
+    credentials: "include",
+    headers: {
+      Accept: "image/*",
+      ...(options.body === undefined
+        ? {}
+        : { "Content-Type": "application/json" }),
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+
+  if (!response.ok) {
+    return throwResponseError(response, path);
+  }
+
+  return response.blob();
+}
+
+async function requestUpload<T>(path: string, file: File): Promise<T> {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "include",
+    headers: { Accept: "application/json" },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    return throwResponseError(response, path);
+  }
+
+  return (await response.json().catch(() => null)) as T;
 }
 
 export const authApi = {
@@ -128,6 +179,68 @@ export const textApi = {
       method: "POST",
       body: input,
     }),
+};
+
+function imagesBasePath(projectId: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/images`;
+}
+
+export const imageApi = {
+  list: (projectId: string) =>
+    request<ImageAssetListResponse>(imagesBasePath(projectId)),
+  upload: (projectId: string, file: File) =>
+    requestUpload<ImageAssetResponse>(imagesBasePath(projectId), file),
+  get: (projectId: string, imageId: string) =>
+    request<ImageAssetResponse>(
+      `${imagesBasePath(projectId)}/${encodeURIComponent(imageId)}`,
+    ),
+  preview: (
+    projectId: string,
+    imageId: string,
+    operations: ImageOperations,
+  ) =>
+    requestBlob(
+      `${imagesBasePath(projectId)}/${encodeURIComponent(imageId)}/preview`,
+      {
+        method: "POST",
+        body: { operations },
+      },
+    ),
+  saveVersion: (
+    projectId: string,
+    imageId: string,
+    input: SaveImageVersionRequest,
+  ) =>
+    request<SaveImageVersionResponse>(
+      `${imagesBasePath(projectId)}/${encodeURIComponent(imageId)}/versions`,
+      {
+        method: "POST",
+        body: input,
+      },
+    ),
+  exportImage: (
+    projectId: string,
+    imageId: string,
+    operations: ImageOperations,
+  ) =>
+    requestBlob(
+      `${imagesBasePath(projectId)}/${encodeURIComponent(imageId)}/export`,
+      {
+        method: "POST",
+        body: { operations },
+      },
+    ),
+  originalFileUrl: (projectId: string, imageId: string) =>
+    `${imagesBasePath(projectId)}/${encodeURIComponent(imageId)}/file`,
+  versionFileUrl: (
+    projectId: string,
+    imageId: string,
+    versionId: string,
+    download = false,
+  ) =>
+    `${imagesBasePath(projectId)}/${encodeURIComponent(imageId)}/versions/${encodeURIComponent(versionId)}/file${
+      download ? "?download=1" : ""
+    }`,
 };
 
 export const aiApi = {

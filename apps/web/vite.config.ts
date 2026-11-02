@@ -18,6 +18,15 @@ export default defineConfig(({ mode }) => {
   return {
     envDir: rootEnvDir,
     plugins: [react(), tailwindcss()],
+    resolve: {
+      // The shared package builds to CommonJS for the API. The browser needs
+      // ESM, so Vite reads the TypeScript source directly.
+      alias: {
+        "@editflow/shared": fileURLToPath(
+          new URL("../../packages/shared/src/index.ts", import.meta.url),
+        ),
+      },
+    },
     server: {
       port: 5173,
       proxy: apiProxy,

@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import type { ErrorRequestHandler, RequestHandler } from "express";
+import multer from "multer";
 import { ZodError } from "zod";
 import { AppError } from "../lib/app-error";
 
@@ -32,6 +33,19 @@ export const errorHandler: ErrorRequestHandler = (
     response.status(error.status).json({
       error: error.message,
       ...(error.fields ? { fields: error.fields } : {}),
+    });
+    return;
+  }
+
+  if (error instanceof multer.MulterError) {
+    const message =
+      error.code === "LIMIT_FILE_SIZE"
+        ? "The image must be 10 MB or smaller."
+        : "The image upload could not be processed.";
+
+    response.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({
+      error: message,
+      fields: { image: message },
     });
     return;
   }

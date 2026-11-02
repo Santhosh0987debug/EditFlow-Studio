@@ -4,6 +4,7 @@ import type { HealthResponse } from "@editflow/shared";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler";
 import { aiRouter } from "./modules/ai/ai.routes";
 import { authRouter } from "./modules/auth/auth.routes";
+import { imageRouter } from "./modules/images/image.routes";
 import { projectsRouter } from "./modules/projects/project.routes";
 import { textRouter } from "./modules/text/text.routes";
 
@@ -34,6 +35,7 @@ app.get("/api/health", (_request, response) => {
 app.use("/api/auth", authRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/projects/:projectId/text", textRouter);
+app.use("/api/projects/:projectId/images", imageRouter);
 app.use("/api/projects", projectsRouter);
 
 app.use(notFoundHandler);

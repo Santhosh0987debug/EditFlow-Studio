@@ -119,9 +119,9 @@ export function LandingPage() {
                   className="h-1.5 w-1.5 rounded-full bg-emerald-400"
                   aria-hidden="true"
                 />
-                Text editor enabled
+                Text and image editors enabled
               </span>
-              <span className="text-slate-500">Phase 3</span>
+              <span className="text-slate-500">Phase 4</span>
             </p>
             <h1
               id="hero-heading"
@@ -136,9 +136,9 @@ export function LandingPage() {
               Prompt-first media editing workspace
             </p>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-400">
-              Describe the change you want in plain language. Start with text:
-              compare the proposal side by side and save only what you accept.
-              Image, audio, and video editing follow later.
+              Describe the change you want in plain language. Edit text with AI
+              proposals, shape images with non-destructive controls, and save
+              only what you approve. Audio and video editing follow later.
             </p>
 
             <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -184,7 +184,7 @@ export function LandingPage() {
               </p>
             </div>
             <span className="text-xs font-medium tracking-[0.2em] text-slate-500 uppercase">
-              Text live · more planned
+              Text and image live · more planned
             </span>
           </div>
 
@@ -214,7 +214,9 @@ export function LandingPage() {
 
       <footer className="relative border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>Text editing with version history · Image, audio, and video later.</p>
+          <p>
+            Text and image editing with version history · Audio and video later.
+          </p>
           <p>React · Express · Prisma</p>
         </div>
       </footer>
