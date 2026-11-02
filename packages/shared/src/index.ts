@@ -75,3 +75,92 @@ export interface ApiErrorResponse {
   error: string;
   fields?: Record<string, string>;
 }
+
+/**
+ * Text actions supported by the prompt-first editing panel.
+ */
+export type TextEditAction =
+  | "rewrite"
+  | "grammar"
+  | "summarize"
+  | "expand"
+  | "tone"
+  | "translate";
+
+/**
+ * How a saved text version came to exist. Versions are append-only.
+ */
+export type TextVersionSource = "manual" | "ai_accepted" | "restored";
+
+export interface TextVersionSummaryDto {
+  id: string;
+  version: number;
+  title: string;
+  source: TextVersionSource;
+  characterCount: number;
+  createdAt: string;
+}
+
+export interface TextVersionDto extends TextVersionSummaryDto {
+  content: string;
+}
+
+export interface TextDocumentDto {
+  id: string;
+  projectId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  versionCount: number;
+  latestVersion: TextVersionDto | null;
+}
+
+export interface TextDocumentResponse {
+  document: TextDocumentDto | null;
+}
+
+export interface SaveTextVersionRequest {
+  title: string;
+  content: string;
+  source?: TextVersionSource;
+}
+
+export interface SaveTextVersionResponse {
+  document: TextDocumentDto;
+  version: TextVersionDto;
+}
+
+export interface TextVersionListResponse {
+  versions: TextVersionSummaryDto[];
+}
+
+export interface TextVersionResponse {
+  version: TextVersionDto;
+}
+
+export interface AiStatusResponse {
+  configured: boolean;
+  provider: string | null;
+  model: string | null;
+  message: string;
+}
+
+export interface AiTextRequest {
+  action: TextEditAction;
+  content: string;
+  instruction?: string;
+  tone?: string;
+  targetLanguage?: string;
+}
+
+export interface AiTextProposalDto {
+  text: string;
+  notes: string[];
+  action: TextEditAction;
+  provider: string;
+  model: string | null;
+}
+
+export interface AiTextResponse {
+  proposal: AiTextProposalDto;
+}

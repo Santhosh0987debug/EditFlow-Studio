@@ -2,8 +2,10 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import type { HealthResponse } from "@editflow/shared";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler";
+import { aiRouter } from "./modules/ai/ai.routes";
 import { authRouter } from "./modules/auth/auth.routes";
 import { projectsRouter } from "./modules/projects/project.routes";
+import { textRouter } from "./modules/text/text.routes";
 
 export const app = express();
 
@@ -30,6 +32,8 @@ app.get("/api/health", (_request, response) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/ai", aiRouter);
+app.use("/api/projects/:projectId/text", textRouter);
 app.use("/api/projects", projectsRouter);
 
 app.use(notFoundHandler);

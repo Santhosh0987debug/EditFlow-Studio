@@ -9,8 +9,18 @@ const prismaMock = vi.hoisted(() => ({
   },
   project: {
     findMany: vi.fn(),
+    findFirst: vi.fn(),
     create: vi.fn(),
     deleteMany: vi.fn(),
+  },
+  textDocument: {
+    findUnique: vi.fn(),
+    upsert: vi.fn(),
+  },
+  textVersion: {
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    create: vi.fn(),
   },
 }));
 
@@ -35,6 +45,23 @@ const projectRecord = {
   updatedAt: createdAt,
 };
 
+const textDocumentRecord = {
+  id: "document_123",
+  projectId: "project_123",
+  title: "Launch teaser",
+  createdAt,
+  updatedAt: createdAt,
+};
+
+const textVersionRecord = {
+  id: "version_1",
+  version: 1,
+  title: "Launch teaser",
+  content: "A short **product** announcement.",
+  source: "manual" as const,
+  createdAt,
+};
+
 const validRegistration = {
   name: "Ada Lovelace",
   email: "Ada@Example.com",
@@ -45,6 +72,24 @@ beforeEach(() => {
   vi.clearAllMocks();
   prismaMock.project.findMany.mockResolvedValue([]);
 });
+
+async function loginAgent(): Promise<ReturnType<typeof request.agent>> {
+  const passwordHash = await bcrypt.hash("correct-horse-battery", 4);
+  prismaMock.user.findUnique.mockResolvedValue({
+    ...publicUser,
+    passwordHash,
+    updatedAt: createdAt,
+  });
+
+  const agent = request.agent(app);
+  const loginResponse = await agent.post("/api/auth/login").send({
+    email: "ada@example.com",
+    password: "correct-horse-battery",
+  });
+  expect(loginResponse.status).toBe(200);
+
+  return agent;
+}
 
 describe("authentication API", () => {
   it("registers a user, hashes the password, and starts a session", async () => {
@@ -294,5 +339,280 @@ describe("project API", () => {
 
     expect(response.status).toBe(404);
     expect(response.body.error).toBe("Project not found.");
+  });
+});
+
+describe("text document API", () => {
+  const ownedProject = { id: "project_123", name: "Launch teaser" };
+
+  it("requires authentication", async () => {
+    const response = await request(app).get(
+      "/api/projects/project_123/text",
+    );
+
+    expect(response.status).toBe(401);
+    expect(prismaMock.textDocument.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("returns a null document for an owned project without text", async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce(ownedProject);
+    prismaMock.textDocument.findUnique.mockResolvedValueOnce(null);
+    const agent = await loginAgent();
+
+    const response = await agent.get("/api/projects/project_123/text");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ document: null });
+    expect(prismaMock.project.findFirst).toHaveBeenCalledWith({
+      where: { id: "project_123", ownerId: publicUser.id },
+      select: { id: true, name: true },
+    });
+  });
+
+  it("returns the latest version with the document", async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce(ownedProject);
+    prismaMock.textDocument.findUnique.mockResolvedValueOnce(
+      textDocumentRecord,
+    );
+    prismaMock.textVersion.findFirst.mockResolvedValueOnce(textVersionRecord);
+    const agent = await loginAgent();
+
+    const response = await agent.get("/api/projects/project_123/text");
+
+    expect(response.status).toBe(200);
+    expect(response.body.document).toEqual({
+      ...textDocumentRecord,
+      createdAt: createdAt.toISOString(),
+      updatedAt: createdAt.toISOString(),
+      versionCount: 1,
+      latestVersion: {
+        ...textVersionRecord,
+        createdAt: createdAt.toISOString(),
+        characterCount: textVersionRecord.content.length,
+      },
+    });
+  });
+
+  it("creates the first version and links it to the project document", async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce(ownedProject);
+    prismaMock.textDocument.upsert.mockResolvedValueOnce(textDocumentRecord);
+    prismaMock.textVersion.findFirst.mockResolvedValueOnce(null);
+    prismaMock.textVersion.create.mockResolvedValueOnce(textVersionRecord);
+    const agent = await loginAgent();
+
+    const response = await agent
+      .post("/api/projects/project_123/text/versions")
+      .send({
+        title: "  Launch teaser  ",
+        content: textVersionRecord.content,
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.version.version).toBe(1);
+    expect(response.body.version.source).toBe("manual");
+    expect(prismaMock.textDocument.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { projectId: "project_123" },
+        create: { projectId: "project_123", title: "Launch teaser" },
+      }),
+    );
+    expect(prismaMock.textVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          documentId: "document_123",
+          version: 1,
+          source: "manual",
+        }),
+      }),
+    );
+  });
+
+  it("appends accepted AI versions without overwriting earlier ones", async () => {
+    const acceptedVersion = {
+      ...textVersionRecord,
+      id: "version_2",
+      version: 2,
+      source: "ai_accepted" as const,
+    };
+
+    prismaMock.project.findFirst.mockResolvedValueOnce(ownedProject);
+    prismaMock.textDocument.upsert.mockResolvedValueOnce(textDocumentRecord);
+    prismaMock.textVersion.findFirst.mockResolvedValueOnce({ version: 1 });
+    prismaMock.textVersion.create.mockResolvedValueOnce(acceptedVersion);
+    const agent = await loginAgent();
+
+    const response = await agent
+      .post("/api/projects/project_123/text/versions")
+      .send({
+        title: "Launch teaser",
+        content: "A clearer product announcement.",
+        source: "ai_accepted",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.version).toMatchObject({
+      id: "version_2",
+      version: 2,
+      source: "ai_accepted",
+    });
+    expect(prismaMock.textVersion.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          version: 2,
+          source: "ai_accepted",
+        }),
+      }),
+    );
+  });
+
+  it("validates saved version input", async () => {
+    const agent = await loginAgent();
+
+    const response = await agent
+      .post("/api/projects/project_123/text/versions")
+      .send({
+        title: "   ",
+        content: "   ",
+        source: "automatic",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.fields.title).toBe("Document title is required.");
+    expect(response.body.fields.content).toBe(
+      "Document content cannot be empty.",
+    );
+    expect(prismaMock.textDocument.upsert).not.toHaveBeenCalled();
+  });
+
+  it("lists version metadata without full content", async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce(ownedProject);
+    prismaMock.textDocument.findUnique.mockResolvedValueOnce({
+      id: "document_123",
+    });
+    prismaMock.textVersion.findMany.mockResolvedValueOnce([
+      textVersionRecord,
+    ]);
+    const agent = await loginAgent();
+
+    const response = await agent.get(
+      "/api/projects/project_123/text/versions",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.versions[0]).toMatchObject({
+      id: "version_1",
+      version: 1,
+      characterCount: textVersionRecord.content.length,
+    });
+    expect(response.body.versions[0]).not.toHaveProperty("content");
+  });
+
+  it("returns a previous version for reopening", async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce(ownedProject);
+    prismaMock.textDocument.findUnique.mockResolvedValueOnce({
+      id: "document_123",
+    });
+    prismaMock.textVersion.findFirst.mockResolvedValueOnce(textVersionRecord);
+    const agent = await loginAgent();
+
+    const response = await agent.get(
+      "/api/projects/project_123/text/versions/version_1",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.version.content).toBe(textVersionRecord.content);
+    expect(prismaMock.textVersion.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "version_1", documentId: "document_123" },
+      }),
+    );
+  });
+
+  it("hides projects and versions the user does not own", async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce(null);
+    const agent = await loginAgent();
+
+    const documentResponse = await agent.get(
+      "/api/projects/not_owned/text",
+    );
+    expect(documentResponse.status).toBe(404);
+    expect(documentResponse.body.error).toBe("Project not found.");
+
+    prismaMock.project.findFirst.mockResolvedValueOnce(ownedProject);
+    prismaMock.textDocument.findUnique.mockResolvedValueOnce({
+      id: "document_123",
+    });
+    prismaMock.textVersion.findFirst.mockResolvedValueOnce(null);
+
+    const versionResponse = await agent.get(
+      "/api/projects/project_123/text/versions/missing",
+    );
+    expect(versionResponse.status).toBe(404);
+    expect(versionResponse.body.error).toBe("Version not found.");
+  });
+});
+
+describe("AI API", () => {
+  it("requires authentication", async () => {
+    const statusResponse = await request(app).get("/api/ai/status");
+    const generateResponse = await request(app)
+      .post("/api/ai/generate")
+      .send({
+        action: "rewrite",
+        content: "Some text.",
+      });
+
+    expect(statusResponse.status).toBe(401);
+    expect(generateResponse.status).toBe(401);
+  });
+
+  it("reports missing provider configuration instead of pretending to work", async () => {
+    const agent = await loginAgent();
+
+    const response = await agent.get("/api/ai/status");
+
+    expect(response.status).toBe(200);
+    expect(response.body.configured).toBe(false);
+    expect(response.body.message).toContain("AI editing is not configured");
+  });
+
+  it("validates action-specific AI input", async () => {
+    const agent = await loginAgent();
+
+    const toneResponse = await agent.post("/api/ai/generate").send({
+      action: "tone",
+      content: "Some text.",
+    });
+    const translationResponse = await agent.post("/api/ai/generate").send({
+      action: "translate",
+      content: "Some text.",
+    });
+    const emptyResponse = await agent.post("/api/ai/generate").send({
+      action: "rewrite",
+      content: "   ",
+    });
+
+    expect(toneResponse.status).toBe(400);
+    expect(toneResponse.body.fields.tone).toBe(
+      "Enter the tone you want to use.",
+    );
+    expect(translationResponse.status).toBe(400);
+    expect(translationResponse.body.fields.targetLanguage).toBe(
+      "Enter the language to translate into.",
+    );
+    expect(emptyResponse.status).toBe(400);
+    expect(emptyResponse.body.fields.content).toBeDefined();
+  });
+
+  it("returns a clear configuration error when no provider is configured", async () => {
+    const agent = await loginAgent();
+
+    const response = await agent.post("/api/ai/generate").send({
+      action: "grammar",
+      content: "their going too the store.",
+    });
+
+    expect(response.status).toBe(503);
+    expect(response.body.error).toContain("AI editing is not configured");
   });
 });

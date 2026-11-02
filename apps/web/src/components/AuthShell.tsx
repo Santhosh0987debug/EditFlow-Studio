@@ -38,15 +38,15 @@ export function AuthShell({
               One calm workspace for every edit.
             </h2>
             <p className="mt-4 text-base leading-7 text-slate-400">
-              Keep your projects organized now. Text, image, audio, and video
-              editing workflows will arrive in later milestones.
+              Write and version text now. Image, audio, and video editing
+              workflows will arrive in later milestones.
             </p>
 
             <ul className="mt-8 space-y-3 text-sm text-slate-300">
               {[
                 "Projects stay private to your account.",
                 "Sessions are protected with secure cookies.",
-                "No editing features are enabled yet.",
+                "Text editing and version history are enabled.",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3">
                   <span

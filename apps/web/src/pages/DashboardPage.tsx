@@ -1,5 +1,6 @@
 import type { ProjectDto } from "@editflow/shared";
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { getErrorMessage, getFieldErrors } from "../api/errors";
 import { useAuth } from "../auth/AuthContext";
 import { Brand } from "../components/Brand";
@@ -171,8 +172,8 @@ export function DashboardPage() {
               Your projects
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">
-              Welcome back, {firstName}. Create a project for each piece of
-              media you want to work on next.
+              Welcome back, {firstName}. Open the text editor from any project,
+              or create a new workspace for what you want to work on next.
             </p>
           </div>
 
@@ -219,8 +220,8 @@ export function DashboardPage() {
               Create a project
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Give this workspace a clear name. Media uploads will be added in
-              a later milestone.
+              Give this workspace a clear name. Text documents are saved as
+              versions inside their project.
             </p>
 
             <form className="mt-5 space-y-4" onSubmit={handleCreate}>
@@ -425,13 +426,21 @@ export function DashboardPage() {
                       <span className="text-xs text-slate-500">
                         Updated {formatDate(project.updatedAt)}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(project)}
-                        disabled={isDeleting}
-                        aria-label={`Delete ${project.name}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-400 transition hover:bg-rose-400/10 hover:text-rose-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
+                      <div className="flex items-center gap-1">
+                        <Link
+                          to={`/editor?project=${encodeURIComponent(project.id)}`}
+                          aria-label={`Open editor for ${project.name}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:border-cyan-300/40 hover:bg-cyan-400/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+                        >
+                          Open editor
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(project)}
+                          disabled={isDeleting}
+                          aria-label={`Delete ${project.name}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-400 transition hover:bg-rose-400/10 hover:text-rose-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
                         {isDeleting ? (
                           <InlineSpinner />
                         ) : (
@@ -449,8 +458,9 @@ export function DashboardPage() {
                             />
                           </svg>
                         )}
-                        {isDeleting ? "Deleting..." : "Delete"}
-                      </button>
+                          {isDeleting ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     </div>
                   </li>
                 );
@@ -462,7 +472,7 @@ export function DashboardPage() {
 
       <footer className="border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-          <p>Projects only · Editing features arrive later.</p>
+          <p>Text editing available · Image, audio, and video later.</p>
           <p>EditFlow Studio</p>
         </div>
       </footer>

@@ -43,6 +43,11 @@ function readJwtSecret(): string {
 const nodeEnv = process.env.NODE_ENV ?? "development";
 const sessionDurationMs = 7 * 24 * 60 * 60 * 1000;
 
+function readOptionalEnv(name: string): string | null {
+  const value = process.env[name]?.trim();
+  return value ? value : null;
+}
+
 export const env = {
   port: readPort(process.env.PORT),
   databaseUrl: requireEnv("DATABASE_URL"),
@@ -51,4 +56,8 @@ export const env = {
   isProduction: nodeEnv === "production",
   sessionCookieName: "editflow_session",
   sessionDurationMs,
+  aiProvider: readOptionalEnv("AI_PROVIDER"),
+  aiApiKey: readOptionalEnv("AI_API_KEY"),
+  aiModel: readOptionalEnv("AI_MODEL"),
+  aiBaseUrl: readOptionalEnv("AI_BASE_URL") ?? "https://api.openai.com/v1",
 } as const;

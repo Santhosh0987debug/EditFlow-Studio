@@ -70,3 +70,19 @@ export async function deleteProject(
     throw new AppError(404, "Project not found.");
   }
 }
+
+export async function getOwnedProject(
+  ownerId: string,
+  projectId: string,
+): Promise<{ id: string; name: string }> {
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, ownerId },
+    select: { id: true, name: true },
+  });
+
+  if (!project) {
+    throw new AppError(404, "Project not found.");
+  }
+
+  return project;
+}

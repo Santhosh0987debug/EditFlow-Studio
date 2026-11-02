@@ -1,4 +1,7 @@
 import type {
+  AiStatusResponse,
+  AiTextRequest,
+  AiTextResponse,
   ApiErrorResponse,
   AuthResponse,
   CreateProjectRequest,
@@ -6,7 +9,12 @@ import type {
   ProjectListResponse,
   ProjectResponse,
   RegisterRequest,
+  SaveTextVersionRequest,
+  SaveTextVersionResponse,
   SessionResponse,
+  TextDocumentResponse,
+  TextVersionListResponse,
+  TextVersionResponse,
 } from "@editflow/shared";
 
 export class ApiClientError extends Error {
@@ -99,5 +107,34 @@ export const projectsApi = {
   delete: (projectId: string) =>
     request<void>(`/api/projects/${encodeURIComponent(projectId)}`, {
       method: "DELETE",
+    }),
+};
+
+function textBasePath(projectId: string): string {
+  return `/api/projects/${encodeURIComponent(projectId)}/text`;
+}
+
+export const textApi = {
+  getDocument: (projectId: string) =>
+    request<TextDocumentResponse>(textBasePath(projectId)),
+  listVersions: (projectId: string) =>
+    request<TextVersionListResponse>(`${textBasePath(projectId)}/versions`),
+  getVersion: (projectId: string, versionId: string) =>
+    request<TextVersionResponse>(
+      `${textBasePath(projectId)}/versions/${encodeURIComponent(versionId)}`,
+    ),
+  saveVersion: (projectId: string, input: SaveTextVersionRequest) =>
+    request<SaveTextVersionResponse>(`${textBasePath(projectId)}/versions`, {
+      method: "POST",
+      body: input,
+    }),
+};
+
+export const aiApi = {
+  status: () => request<AiStatusResponse>("/api/ai/status"),
+  generate: (input: AiTextRequest) =>
+    request<AiTextResponse>("/api/ai/generate", {
+      method: "POST",
+      body: input,
     }),
 };
